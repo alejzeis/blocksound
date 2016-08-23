@@ -1,0 +1,25 @@
+{
+	"name": "blocksound",
+	"authors": [
+		"jython234"
+	],
+	"description": "OpenAL utility library for playing sounds.",
+	"copyright": "Copyright © 2016, jython234",
+	"license": "Zlib",
+    "dependencies": {
+		"derelict_extras-sndfile": "~>2.0.1"
+	},
+	"configurations": [
+		{
+			"name": "openal-backend",
+			"targetType": "staticLibrary",
+			"targetPath": "bin",
+			"versions": [
+				"blocksound_ALBackend"	
+			],
+			"dependencies": {
+				"derelict-al": "~>1.0.1"
+			}
+		}
+	]
+}

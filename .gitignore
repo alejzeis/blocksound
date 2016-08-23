@@ -14,6 +14,9 @@
 # Executables
 *.exe
 
+# Bin Directory
+bin/*
+
 # DUB
 .dub
 docs.json
