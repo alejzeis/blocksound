@@ -3,6 +3,8 @@ module blocksound.core;
 import derelict.openal.al;
 import derelict.sndfile.sndfile;
 
+public import blocksound.util;
+
 package shared bool INIT = false;
 
 debug(blocksound_verbose) {
@@ -67,42 +69,4 @@ void init(in bool skipALload = false, in bool skipSFLoad = false) @trusted {
         import std.stdio : writeln;
         writeln("[BlockSound]: Libraries loaded.\n");
     }
-}
-
-/// Vector 3 struct with floats.
-struct Vec3 {
-    /// X coordinate
-    float x;
-    /// Y coordinate
-    float y;
-    /// Z coordinate
-    float z;
-}
-
-/++
-    Converts a D string (immutable(char[])) to a C string
-    (char*).
-
-    Params:
-            dString =   The D string to be converted.
-
-    Returns: A C string (char array).
-+/
-char* toCString(in string dString) @trusted {
-    import std.string : toStringz;
-    return cast(char*) toStringz(dString);
-}
-
-/++
-    Converts a C string (char array) to a D string
-    (immutable(char[]))
-
-    Params:
-            cString =   The C string to be converted.
-
-    Returns: A D string (immutable(char[]))
-+/
-string toDString(char* cString) @trusted {
-    import std.string : fromStringz;
-    return cast(string) fromStringz(cString);
 }

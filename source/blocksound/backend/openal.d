@@ -10,8 +10,8 @@ version(blocksound_ALBackend) {
     import derelict.openal.al;
     import derelict.sndfile.sndfile;
 
-    /// Class to manage the OpenAL backend.
-    class ALBackend : Backend {
+    /// Class to manage the OpenAL Audio backend.
+    class ALAudioBackend : AudioBackend {
         protected ALCdevice* device;
         protected ALCcontext* context;
 
@@ -38,6 +38,11 @@ version(blocksound_ALBackend) {
                 alListenerf(AL_GAIN, gain);
             }
         }
+    }
+
+    /// OpenAL Sound backend
+    class ALSound : Sound {
+
     }
 
     /++
