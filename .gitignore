@@ -17,6 +17,9 @@
 # Bin Directory
 bin/*
 
+# VSCode
+.vscode/*
+
 # DUB
 .dub
 docs.json

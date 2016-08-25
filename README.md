@@ -1,2 +1,7 @@
 # blocksound
-A cross-platform sound library. Currently uses OpenAL as a backend (but more to come)
+A high level cross-platform sound library.
+
+### Backends:
+- OpenAL
+
+

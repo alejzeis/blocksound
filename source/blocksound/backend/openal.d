@@ -16,7 +16,7 @@ version(blocksound_ALBackend) {
         protected ALCcontext* context;
 
         /// Create a new ALBackend. One per thread.
-        this() @trusted nothrow {
+        this() @trusted {
             debug(blocksound_verbose) {
                 import std.stdio : writeln;
                 writeln("[BlockSound]: Initializing OpenAL backend...");
@@ -26,7 +26,6 @@ version(blocksound_ALBackend) {
             context = alcCreateContext(device, null);
 
             alcMakeContextCurrent(context);
-
         }
 
         override {
@@ -37,12 +36,67 @@ version(blocksound_ALBackend) {
             void setListenerGain(in float gain) @trusted nothrow {
                 alListenerf(AL_GAIN, gain);
             }
+
+            void cleanup() @trusted nothrow {
+                alcCloseDevice(device);
+            }
+        }
+    }
+
+    /// OpenAL Source backend
+    class ALSource : Source {
+        private ALuint source;
+
+        package this() {
+            alGenSources(1, &source);
+        }
+
+        override {
+            protected void _setSound(Sound sound) @trusted {
+                if(auto s = cast(ALSound) sound) {
+                    alSourcei(source, AL_BUFFER, s.buffer);
+                } else {
+                    throw new Exception("Invalid Sound: not instance of ALSound");
+                }
+            }
+
+            void play() @trusted nothrow {
+                alSourcePlay(source);
+            }
+
+            void stop() @trusted nothrow {
+                alSourceStop(source);
+            }
+
+            bool hasFinishedPlaying() @trusted nothrow {
+                ALenum state;
+                alGetSourcei(source, AL_SOURCE_STATE, &state);
+                return state != AL_PLAYING;
+            }
+
+            protected void _cleanup() @system nothrow {
+                alDeleteSources(1, &source);
+            }
         }
     }
 
     /// OpenAL Sound backend
     class ALSound : Sound {
+        private ALuint _buffer;
 
+        @property ALuint buffer() @safe nothrow { return _buffer; }
+
+        protected this(ALuint buffer) @safe nothrow {
+            _buffer = buffer;
+        }
+
+        static ALSound loadSound(in string filename) @trusted {
+            return new ALSound(loadSoundToBuffer(filename));
+        }
+
+        override void cleanup() @trusted nothrow {
+            alDeleteBuffers(1, &_buffer);
+        }
     }
 
     /++
@@ -55,7 +109,7 @@ version(blocksound_ALBackend) {
         Throws: Exception if file is not found, or engine is not initialized.
         Returns: An OpenAL buffer containing the sound.
     +/
-    ALuint loadSoundToBuffer(in string filename) @trusted {
+    ALuint loadSoundToBuffer(in string filename) @system {
         import std.exception : enforce;
         import std.file : exists;
 
@@ -83,5 +137,51 @@ version(blocksound_ALBackend) {
         sf_close(file);
 
         return buffer;
+    }
+
+    /++
+        Loads libraries required by the OpenAL backend.
+        This is called automatically by blocksound's init
+        function.
+
+        Params:
+                skipALload =    Skips loading OpenAL from derelict.
+                                Set this to true if your application loads
+                                OpenAL itself before blocksound does.
+
+                skipSFLoad =    Skips loading libsndfile from derelict.
+                                Set this to true if your application loads
+                                libsdnfile itself before blocksound does.
+    +/
+    void loadLibraries(bool skipALload = false, bool skipSFload = false) @system {
+        if(!skipALload) {
+            version(Windows) {
+                try {
+                    DerelictAL.load(); // Search for system libraries first.
+                    debug(blocksound_verbose) notifyLoadLib("OpenAL");
+                } catch(Exception e) {
+                    DerelictAL.load("lib\\openal32.dll"); // Try to use provided library.
+                    debug(blocksound_verbose) notifyLoadLib("OpenAL");
+                }
+            } else {
+                DerelictAL.load();
+                debug(blocksound_verbose) notifyLoadLib("OpenAL");
+            }
+        }
+
+        if(!skipSFload) {
+            version(Windows) {
+                try {
+                    DerelictSndFile.load(); // Search for system libraries first.
+                    debug(blocksound_verbose) notifyLoadLib("libsndfile");
+                } catch(Exception e) {
+                    DerelictSndFile.load("lib\\libsndfile-1.dll"); // Try to use provided library.
+                    debug(blocksound_verbose) notifyLoadLib("libsndfile");
+                }
+            } else {
+                DerelictSndFile.load();
+                debug(blocksound_verbose) notifyLoadLib("libsndfile");
+            }
+        }
     }
 }

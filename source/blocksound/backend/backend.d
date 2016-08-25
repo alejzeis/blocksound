@@ -8,12 +8,14 @@ abstract class AudioBackend {
     abstract void setListenerLocation(in Vec3 loc) @trusted;
 
     abstract void setListenerGain(in float gain) @trusted;
+
+    abstract void cleanup() @trusted;
 }
 
 /// Represents a source that emits audio.
 abstract class Source {
     protected Vec3 _location;
-    protected ArrayList!Sound sounds;
+    protected Sound sound;
 
     /// The location of the source.
     @property Vec3 location() @safe nothrow { return _location; }
@@ -21,13 +23,40 @@ abstract class Source {
     @property void location(Vec3 loc) @safe nothrow {
         _location = loc;
     }
+
+    /++
+        Create a new source. The backend class will automatically be
+        determined.
+
+        Returns: A new Source instance.
+    +/
+    static Source newSource(Vec3 location) {
+        version(blocksound_ALBackend) {
+            import blocksound.backend.openal : ALSource;
+
+            Source source = new ALSource();
+            source.location = location;
+            return source;
+        } else {
+            throw new Exception("No backend avaliable! (Try compiling with version \"blocksound_ALBackend\" enabled)");
+        }
+    }
     
-    abstract void addSound(Sound sound) @trusted;
+    final void setSound(Sound sound) @trusted {
+        this.sound = sound;
+        _setSound(sound);
+    }
+
+    protected abstract void _setSound(Sound sound) @trusted;
+
+    abstract void play() @trusted;
+
+    abstract void stop() @trusted;
+
+    abstract bool hasFinishedPlaying() @trusted;
 
     final void cleanup() @trusted {
-        foreach(sound; (cast(shared) sounds).array) {
-            sound.cleanup();
-        }
+        sound.cleanup();
         _cleanup();
     }
 
@@ -40,8 +69,8 @@ abstract class Source {
 
     TODO: STREAMING
 +/
-abstract class Sound {
+interface Sound {
 
     /// Frees resources used by the sound.
-    abstract void cleanup() @trusted;
+    void cleanup() @trusted;
 }
