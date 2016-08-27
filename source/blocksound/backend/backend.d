@@ -23,6 +23,13 @@ module blocksound.backend.backend;
 
 import blocksound.core;
 
+debug(blocksound_verbose) {
+    package void notifyLoadLib(string lib) @safe {
+        import std.stdio : writeln;
+        writeln("[BlockSound]: Loaded ", lib);
+    }
+}
+
 /// Base class for the audio backend.
 abstract class AudioBackend {
     

@@ -31,13 +31,6 @@ immutable string VERSION = "v1.0-rc1";
 
 package shared bool INIT = false;
 
-debug(blocksound_verbose) {
-    private void notifyLoadLib(string lib) @safe {
-        import std.stdio : writeln;
-        writeln("[BlockSound]: Loaded ", lib);
-    }
-}
-
 /++
     Init the library. This must be called before any other library
     features are used.

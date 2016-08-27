@@ -24,7 +24,6 @@ module blocksound.audio;
 import blocksound.core;
 import blocksound.backend.backend;
 
-public import blocksound.backend.backend : Source, Sound;
 
 version(blocksound_ALBackend) {
     import blocksound.backend.openal;
