@@ -95,6 +95,10 @@ version(blocksound_ALBackend) {
                 alSourcePlay(source);
             }
 
+            void pause() @trusted nothrow {
+                alSourcePause(source);
+            }
+
             void stop() @trusted nothrow {
                 alSourceStop(source);
             }

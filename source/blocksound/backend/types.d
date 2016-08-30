@@ -116,6 +116,9 @@ abstract class Source {
     /// Plays the Sound that belongs to this Source.
     abstract void play() @trusted;
 
+    /// Pause the Sound that is playing.
+    abstract void pause() @trusted;
+
     /// Stops playing the Sound.
     abstract void stop() @trusted;
 
