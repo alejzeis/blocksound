@@ -26,7 +26,7 @@ version(blocksound_ALBackend) {
     pragma(msg, "-----Using OpenAL backend-----");
 
     import blocksound.core;
-    import blocksound.backend.backend;
+    import blocksound.backend.types;
 
     import derelict.openal.al;
     import derelict.sndfile.sndfile;

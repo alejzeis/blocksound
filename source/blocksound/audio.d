@@ -22,11 +22,30 @@
 module blocksound.audio;
 
 import blocksound.core;
-import blocksound.backend.backend;
+import blocksound.backend.types;
 
+public import blocksound.backend.types : Source, Sound;
 
 version(blocksound_ALBackend) {
     import blocksound.backend.openal;
+}
+
+/++
+    Loads a Sound from a file.
+
+    Params:
+            file =  The file where the sound is stored.
+
+    Returns: A Sound instance loaded from the specified file.
++/
+Sound loadSoundFile(in string file) @system {
+    version(blocksound_ALBackend) {
+        import blocksound.backend.openal : ALSound;
+
+        return ALSound.loadSound(file);
+    } else {
+        throw new Exception("No backend avaliable! (Try compiling with version \"blocksound_ALBackend\" enabled)");
+    }
 }
 
 /// Manages the Audio.
@@ -35,7 +54,7 @@ class AudioManager {
     private float _gain;
 
     private AudioBackend backend;
-    private ArrayList!Source sources;
+    private shared ArrayList!Source sources;
 
     /// The location where the listener is.
     @property Vec3 listenerLocation() @safe nothrow { return _listenerLocation; }
@@ -67,14 +86,35 @@ class AudioManager {
         } else {
             throw new Exception("No backend avaliable! (Try compiling with version \"blocksound_ALBackend\" enabled)");
         }
+
+        sources = new ArrayList!Source();
     }
 
-    Sound loadSoundFromFile(in string filename) {
-        version(blocksound_ALBackend) {
-            return ALSound.loadSound(filename);
-        } else {
-            throw new Exception("No backend avaliable! (Try compiling with version \"blocksound_ALBackend\" enabled)");
-        }
+    /++
+        Create a a new Source at the specified
+        location. The Source is also added to this AudioManager.
+
+        Params:
+                location =  The location of the Source.
+
+        Returns: A new Source.
+    +/
+    Source createSource(Vec3 location) @trusted {
+        Source source = backend_createSource(location);
+        sources.add(source);
+        return source;
+    }
+
+    /++
+        Deletes a Source, frees it's resources,
+        and removes it from the AudioManager.
+
+        Params:
+                source =    The source to be deleted.
+    +/
+    void deleteSource(Source source) @trusted {
+        sources.remove(source);
+        source.cleanup();
     }
 
     /// Cleanup any resources used by the backend.

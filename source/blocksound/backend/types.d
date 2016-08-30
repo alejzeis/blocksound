@@ -19,7 +19,7 @@
  *     misrepresented as being the original software.
  *  3. This notice may not be removed or altered from any source distribution.
 */
-module blocksound.backend.backend;
+module blocksound.backend.types;
 
 import blocksound.core;
 
@@ -27,6 +27,19 @@ debug(blocksound_verbose) {
     package void notifyLoadLib(string lib) @safe {
         import std.stdio : writeln;
         writeln("[BlockSound]: Loaded ", lib);
+    }
+}
+
+/// Used by AudioManager to create a source.
+Source backend_createSource(Vec3 loc) @system {
+    version(blocksound_ALBackend) {
+        import blocksound.backend.openal : ALSource;
+
+        Source source = new ALSource();
+        source.location = loc;
+        return source;
+    } else {
+        throw new Exception("No backend avaliable! (Try compiling with version \"blocksound_ALBackend\" enabled)");
     }
 }
 
