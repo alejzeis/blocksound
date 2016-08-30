@@ -27,7 +27,7 @@ import derelict.sndfile.sndfile;
 public import blocksound.util;
 
 /// Library Version
-immutable string VERSION = "v1.0-rc1";
+immutable string VERSION = "v1.0-rc2";
 
 package shared bool INIT = false;
 
@@ -38,10 +38,10 @@ package shared bool INIT = false;
 void init() @trusted {
     debug(blocksound_verbose) {
         import std.stdio : writeln;
-        version(blocksound_ALBackend) {
-            writeln("\n[BlockSound]: BlockSound ", VERSION, " compiled with OpenAL backend.");
-        }
-        writeln("\n[BlockSound]: Loading libraries...");
+        import blocksound.backend.types : BACKEND;
+
+        writeln("\n[BlockSound]: BlockSound ", VERSION, " compiled with ", BACKEND, " backend.");
+        writeln("[BlockSound]: Loading libraries...");
     }
 
     version(blocksound_ALBackend) {

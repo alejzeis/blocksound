@@ -30,6 +30,12 @@ debug(blocksound_verbose) {
     }
 }
 
+version(blocksound_ALBackend) {
+    immutable string BACKEND = "OpenAL";
+} else {
+    immutable string BACKEND = "None";
+}
+
 /// Used by AudioManager to create a source.
 Source backend_createSource(Vec3 loc) @system {
     version(blocksound_ALBackend) {

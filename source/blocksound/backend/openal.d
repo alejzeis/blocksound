@@ -47,6 +47,12 @@ version(blocksound_ALBackend) {
             context = alcCreateContext(device, null);
 
             alcMakeContextCurrent(context);
+
+            debug(blocksound_verbose) {
+                import std.stdio : writeln;
+                writeln("[BlockSound]: OpenAL Backend initialized.");
+                writeln("[BlockSound]: AL_VERSION: ", toDString(alGetString(AL_VERSION)), ", AL_VENDOR: ", toDString(alGetString(AL_VENDOR)));
+            }
         }
 
         override {

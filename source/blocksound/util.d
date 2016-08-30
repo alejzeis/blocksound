@@ -102,7 +102,7 @@ char* toCString(in string dString) @trusted {
 
     Returns: A D string (immutable(char[]))
 +/
-string toDString(char* cString) @trusted {
+string toDString(in char* cString) @trusted {
     import std.string : fromStringz;
     return cast(string) fromStringz(cString);
 }
