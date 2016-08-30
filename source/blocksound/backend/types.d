@@ -31,8 +31,10 @@ debug(blocksound_verbose) {
 }
 
 version(blocksound_ALBackend) {
+    /// Name of the backend used for blocksound.
     immutable string BACKEND = "OpenAL";
 } else {
+    /// Name of the backend used for blocksound.
     immutable string BACKEND = "None";
 }
 
@@ -77,6 +79,7 @@ abstract class Source {
 
         Returns: A new Source instance.
     +/
+    deprecated("Use AudioManager.createSource()") 
     static Source newSource(Vec3 location) {
         version(blocksound_ALBackend) {
             import blocksound.backend.openal : ALSource;
@@ -89,6 +92,12 @@ abstract class Source {
         }
     }
     
+    /++
+        Set the Sound that this Source plays.
+
+        Params:
+                sound =     The Sound that the Source plays.
+    +/
     final void setSound(Sound sound) @trusted {
         this.sound = sound;
         _setSound(sound);
@@ -96,12 +105,26 @@ abstract class Source {
 
     protected abstract void _setSound(Sound sound) @trusted;
 
+    /++
+        Set if the Source should loop the Sound.
+
+        Params:
+                loop =  If the Source should loop it's Sound.
+    +/
+    abstract void setLooping(in bool loop) @trusted;
+
+    /// Plays the Sound that belongs to this Source.
     abstract void play() @trusted;
 
+    /// Stops playing the Sound.
     abstract void stop() @trusted;
 
+    /++
+        Returns: If the Source has stopped playing it's Sound.
+    +/
     abstract bool hasFinishedPlaying() @trusted;
 
+    /// Cleans up the resources used by the Source.
     final void cleanup() @trusted {
         sound.cleanup();
         _cleanup();

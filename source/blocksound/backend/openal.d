@@ -87,6 +87,10 @@ version(blocksound_ALBackend) {
                 }
             }
 
+            void setLooping(in bool loop) @trusted {
+                alSourcei(source, AL_LOOPING, loop ? AL_TRUE : AL_FALSE);
+            }
+ 
             void play() @trusted nothrow {
                 alSourcePlay(source);
             }
