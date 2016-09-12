@@ -275,7 +275,7 @@ version(blocksound_ALBackend) {
             buffers = new ALuint[numBuffers];
         }
 
-        static ALStreamedSound loadSound(in string filename, in ALuint bufferNumber = 2) @system {
+        static ALStreamedSound loadSound(in string filename, in ALuint bufferNumber = 4) @system {
             import std.exception : enforce;
             import std.file : exists;
 
