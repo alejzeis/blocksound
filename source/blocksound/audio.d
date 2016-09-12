@@ -24,7 +24,7 @@ module blocksound.audio;
 import blocksound.core;
 import blocksound.backend.types;
 
-public import blocksound.backend.types : Source, Sound;
+public import blocksound.backend.types : Source, Sound, StreamingSource, StreamedSound;
 
 version(blocksound_ALBackend) {
     import blocksound.backend.openal;
@@ -43,6 +43,25 @@ Sound loadSoundFile(in string file) @system {
         import blocksound.backend.openal : ALSound;
 
         return ALSound.loadSound(file);
+    } else {
+        throw new Exception("No backend avaliable! (Try compiling with version \"blocksound_ALBackend\" enabled)");
+    }
+}
+
+/++
+    Loads a Sound from a file for streaming.
+
+    Params:
+            file =  The file where the sound is stored.
+
+    Returns: A StreamedSound instance loaded from the specified file.
++/
+StreamedSound loadStreamingSoundFile(in string file, in size_t numBuffers = 2) @system {
+    version(blocksound_ALBackend) {
+        import blocksound.backend.openal : ALStreamedSound;
+        import derelict.openal.al : ALuint;
+
+        return ALStreamedSound.loadSound(file, cast(ALuint) numBuffers);
     } else {
         throw new Exception("No backend avaliable! (Try compiling with version \"blocksound_ALBackend\" enabled)");
     }
@@ -101,6 +120,22 @@ class AudioManager {
     +/
     Source createSource(Vec3 location) @trusted {
         Source source = backend_createSource(location);
+        sources.add(source);
+        return source;
+    }
+
+    /++
+        Create a a new StreamingSource at the specified
+        location. The Source is also added to this AudioManager.
+        This is for Streaming sounds.
+
+        Params:
+                location =  The location of the Source.
+
+        Returns: A new Source.
+    +/
+    StreamingSource createStreamingSource(Vec3 location) @trusted {
+        StreamingSource source = backend_createStreamingSource(location);
         sources.add(source);
         return source;
     }

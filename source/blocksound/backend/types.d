@@ -51,6 +51,19 @@ Source backend_createSource(Vec3 loc) @system {
     }
 }
 
+/// Used by AudioManager to create a streaming source.
+StreamingSource backend_createStreamingSource(Vec3 loc) @system {
+    version(blocksound_ALBackend) {
+        import blocksound.backend.openal : ALStreamingSource;
+
+        StreamingSource source = new ALStreamingSource();
+        source.location = loc;
+        return source;
+    } else {
+        throw new Exception("No backend avaliable! (Try compiling with version \"blocksound_ALBackend\" enabled)");
+    }
+}
+
 /// Base class for the audio backend.
 abstract class AudioBackend {
     
@@ -136,6 +149,11 @@ abstract class Source {
     abstract protected void _cleanup();
 }
 
+/// Represents a source that emits audio, uses streaming
+abstract class StreamingSource : Source {
+
+}
+
 /++
     Represents a sound, loaded in memory. For
     larger sounds, consider using streaming instead.
@@ -143,7 +161,15 @@ abstract class Source {
     TODO: STREAMING
 +/
 interface Sound {
-
     /// Frees resources used by the sound.
     void cleanup() @trusted;
+}
+
+/++
+    Represents a sound which is loaded in chunks
+    while playing, to save memory. Use for long/large
+    sounds. 
++/
+interface StreamedSound : Sound {
+    
 }

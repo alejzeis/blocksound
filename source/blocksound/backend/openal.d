@@ -23,7 +23,7 @@ module blocksound.backend.openal;
 
 version(blocksound_ALBackend) {
 
-    pragma(msg, "-----Using OpenAL backend-----");
+    pragma(msg, "-----BlockSound using OpenAL backend-----");
 
     import blocksound.core;
     import blocksound.backend.types;
@@ -115,6 +115,131 @@ version(blocksound_ALBackend) {
         }
     }
 
+    class ALStreamingSource : StreamingSource {
+        import std.concurrency;
+
+        static immutable size_t
+            STREAM_CMD_PLAY = 0,
+            STREAM_CMD_PAUSE = 1,
+            STREAM_CMD_STOP = 2,
+            STREAM_IS_PLAYING = 3,
+            STREAM_STATE_PLAYING = 4,
+            STREAM_STATE_STOPPED = 5;
+
+        package ALuint source;
+
+        private Tid streamThread;
+        private ALStreamedSound sound;
+
+        package this() {
+            alGenSources(1, &source);
+        }
+
+        override {
+            protected void _setSound(Sound sound) @trusted {
+                if(!(this.sound is null)) throw new Exception("Sound already set!");
+
+                if(auto s = cast(ALStreamedSound) sound) {
+                    this.sound = s;
+
+                    alSourceQueueBuffers(source, s.numBuffers, s.buffers.ptr);
+                    streamThread = spawn(&streamSoundThread, cast(shared) this, cast(shared) this.sound);
+                } else {
+                    throw new Exception("Invalid Sound: not instance of ALStreamedSound");
+                }
+            }
+
+            void setLooping(in bool loop) @trusted {
+                //alSourcei(source, AL_LOOPING, loop ? AL_TRUE : AL_FALSE);
+                //TODO
+            }
+ 
+            void play() @trusted {
+                alSourcePlay(source);
+                streamThread.send(STREAM_CMD_PLAY);
+            }
+
+            void pause() @trusted {
+                alSourcePause(source);
+                send(streamThread, STREAM_CMD_PAUSE);
+            }
+
+            void stop() @trusted {
+                alSourceStop(source);
+                send(streamThread, STREAM_CMD_STOP);
+            }
+
+            bool hasFinishedPlaying() @trusted nothrow {
+                //TODO: THREAD!
+                ALenum state;
+                alGetSourcei(source, AL_SOURCE_STATE, &state);
+                return state != AL_PLAYING;
+            }
+
+            protected void _cleanup() @system nothrow {
+                alDeleteSources(1, &source);
+            }
+        }
+    }   
+
+    package void streamSoundThread(shared ALStreamingSource source, shared ALStreamedSound sound) @system {
+        import std.concurrency;
+        import std.datetime;
+        import core.thread;
+
+        bool hasFinished = false;
+        bool isPlaying = false;
+        
+        while(true) {
+            receiveTimeout(dur!("msecs")(1), 
+                (immutable size_t signal) {
+                    switch(signal) {
+                        case ALStreamingSource.STREAM_CMD_PLAY:
+                            isPlaying = true;
+                            break;
+                        default:
+                            break;
+                    }
+            });
+
+            if(isPlaying) {
+                // TODO: Streaming here
+                ALint state, processed;
+
+                alGetSourcei(source.source, AL_SOURCE_STATE, &state);
+                alGetSourcei(source.source, AL_BUFFERS_PROCESSED, &processed);
+                if(processed > 0) {
+                    alSourceUnqueueBuffers(cast(ALuint) source.source, processed, (cast(ALuint[])sound.buffers).ptr);
+
+                    alDeleteBuffers(processed, (cast(ALuint[])sound.buffers).ptr);
+                    for(size_t i = 0; i < processed; i++) {
+                        try {
+                            ALuint buffer = (cast(ALStreamedSound) sound).queueBuffer();
+                            sound.buffers[i] = buffer;
+                            /*debug {
+                                import std.stdio;
+                                writeln("refill ", i, " ", processed);
+                            }*/
+                        } catch(Exception e) {
+                            throw new Exception("CAUGHT EOF!");
+                        }
+                    }
+
+                    alSourceQueueBuffers(cast(ALuint) source.source, processed, (cast(ALuint[])sound.buffers).ptr);
+                }
+                if(state != AL_PLAYING) {
+                    alSourcePlay(source.source);
+                }
+
+                Thread.sleep(dur!("msecs")(25));
+            }
+
+            if(hasFinished) {
+                break;
+            }
+        }
+    }
+
     /// OpenAL Sound backend
     class ALSound : Sound {
         private ALuint _buffer;
@@ -132,6 +257,81 @@ version(blocksound_ALBackend) {
         override void cleanup() @trusted nothrow {
             alDeleteBuffers(1, &_buffer);
         }
+    }
+
+    /// OpenAL Sound backend (for streaming)
+    class ALStreamedSound : StreamedSound {
+        private SF_INFO soundInfo;
+        private SNDFILE* file;
+
+        package ALuint numBuffers;
+        package ALuint[] buffers;
+
+        private this(SF_INFO soundInfo, SNDFILE* file, ALuint numBuffers) @safe {
+            this.soundInfo = soundInfo;
+            this.file = file;
+            this.numBuffers = numBuffers;
+
+            buffers = new ALuint[numBuffers];
+        }
+
+        static ALStreamedSound loadSound(in string filename, in ALuint bufferNumber = 2) @system {
+            import std.exception : enforce;
+            import std.file : exists;
+
+            enforce(INIT, new Exception("BlockSound has not been initialized!"));
+            enforce(exists(filename), new Exception("File \"" ~ filename ~ "\" does not exist!"));
+
+            SF_INFO info;
+            SNDFILE* file;
+
+            file = sf_open(toCString(filename), SFM_READ, &info);
+
+            // Fix for OGG pops and crackles.
+            sf_command(file, SFC_SET_SCALE_FLOAT_INT_READ, cast(void*) 1, cast(int) byte.sizeof);
+
+            ALStreamedSound sound =  new ALStreamedSound(info, file, bufferNumber);
+            for(size_t i = 0; i < bufferNumber; i++) {
+                ALuint buffer = sound.queueBuffer();
+                sound.buffers[i] = buffer;
+            }
+
+            return sound;
+        }
+
+        private ALuint queueBuffer() @system {
+            ALuint buffer;
+            alGenBuffers(1, &buffer);
+
+            AudioBuffer ab = sndfile_readShorts(file, soundInfo, 4800);
+            alBufferData(buffer, soundInfo.channels == 1 ? AL_FORMAT_MONO16 : AL_FORMAT_STEREO16, ab.data.ptr, cast(int) (ab.data.length * short.sizeof), soundInfo.samplerate);
+            return buffer;
+        }
+
+        override {
+            void cleanup() @trusted {
+                alDeleteBuffers(numBuffers, buffers.ptr);
+                sf_close(file);
+            }
+        }
+    }
+
+    AudioBuffer sndfile_readShorts(SNDFILE* file, SF_INFO info, size_t frames) @system {
+        AudioBuffer ab;
+
+        ab.data = new short[frames * info.channels];
+
+        if((ab.remaining = sf_read_short(file, ab.data.ptr, ab.data.length)) == 0) {
+            throw new Exception("EOF!");
+        } 
+
+        return ab;
+    }
+
+    
+    package struct AudioBuffer {
+        short[] data;
+        sf_count_t remaining;
     }
 
     /++
