@@ -115,6 +115,7 @@ version(blocksound_ALBackend) {
         }
     }
 
+    /// OpenAL Source backend (for streaming.)
     class ALStreamingSource : StreamingSource {
         import std.concurrency;
 
@@ -122,14 +123,18 @@ version(blocksound_ALBackend) {
             STREAM_CMD_PLAY = 0,
             STREAM_CMD_PAUSE = 1,
             STREAM_CMD_STOP = 2,
-            STREAM_IS_PLAYING = 3,
-            STREAM_STATE_PLAYING = 4,
-            STREAM_STATE_STOPPED = 5;
+            STREAM_CMD_SET_LOOP_TRUE = 3,
+            STREAM_CMD_SET_LOOP_FALSE = 4,
+            STREAM_IS_PLAYING = 5,
+            STREAM_STATE_PLAYING = 6,
+            STREAM_STATE_STOPPED = 7;
 
         package ALuint source;
 
         private Tid streamThread;
         private ALStreamedSound sound;
+
+        package shared finishedPlaying = false;
 
         package this() {
             alGenSources(1, &source);
@@ -151,7 +156,7 @@ version(blocksound_ALBackend) {
 
             void setLooping(in bool loop) @trusted {
                 //alSourcei(source, AL_LOOPING, loop ? AL_TRUE : AL_FALSE);
-                //TODO
+                streamThread.send(loop ? STREAM_CMD_SET_LOOP_TRUE : STREAM_CMD_SET_LOOP_FALSE);
             }
  
             void play() @trusted {
@@ -161,19 +166,20 @@ version(blocksound_ALBackend) {
 
             void pause() @trusted {
                 alSourcePause(source);
-                send(streamThread, STREAM_CMD_PAUSE);
+                streamThread.send(STREAM_CMD_PAUSE);
             }
 
             void stop() @trusted {
                 alSourceStop(source);
-                send(streamThread, STREAM_CMD_STOP);
+                streamThread.send(STREAM_CMD_STOP);
             }
 
             bool hasFinishedPlaying() @trusted nothrow {
-                //TODO: THREAD!
+                /*
                 ALenum state;
                 alGetSourcei(source, AL_SOURCE_STATE, &state);
-                return state != AL_PLAYING;
+                return state != AL_PLAYING;*/
+                return finishedPlaying;
             }
 
             protected void _cleanup() @system nothrow {
@@ -182,6 +188,7 @@ version(blocksound_ALBackend) {
         }
     }   
 
+    /// The dedicated sound streaming thread. This is used to refill buffers while streaming sound.
     package void streamSoundThread(shared ALStreamingSource source, shared ALStreamedSound sound) @system {
         import std.concurrency;
         import std.datetime;
@@ -189,54 +196,92 @@ version(blocksound_ALBackend) {
 
         bool hasFinished = false;
         bool isPlaying = false;
+        bool loop = false;
+
+        debug(blocksound_verbose) {
+            import std.stdio;
+            writeln("[BlockSound]: Started dedicated streaming thread.");
+        }
         
         while(true) {
-            receiveTimeout(dur!("msecs")(1), 
+            receiveTimeout(dur!("msecs")(1), // Check for messages from main thread.
                 (immutable size_t signal) {
                     switch(signal) {
                         case ALStreamingSource.STREAM_CMD_PLAY:
                             isPlaying = true;
+                            break;
+                        case ALStreamingSource.STREAM_CMD_PAUSE:
+                            isPlaying = false;
+                            break;
+                        case ALStreamingSource.STREAM_CMD_STOP:
+                            isPlaying = false;
+                            hasFinished = true;
+                            break;
+
+                        case ALStreamingSource.STREAM_CMD_SET_LOOP_TRUE:
+                            loop = true;
+                            break;
+                        case ALStreamingSource.STREAM_CMD_SET_LOOP_FALSE:
+                            loop = false;
                             break;
                         default:
                             break;
                     }
             });
 
-            if(isPlaying) {
-                // TODO: Streaming here
+            if(isPlaying) { // Check if we are supposed to be playing (refilling buffers)
                 ALint state, processed;
 
-                alGetSourcei(source.source, AL_SOURCE_STATE, &state);
-                alGetSourcei(source.source, AL_BUFFERS_PROCESSED, &processed);
+                alGetSourcei(source.source, AL_SOURCE_STATE, &state); // Get the state of the audio.
+                alGetSourcei(source.source, AL_BUFFERS_PROCESSED, &processed); // Get the amount of buffers that OpenAL has played.
                 if(processed > 0) {
-                    alSourceUnqueueBuffers(cast(ALuint) source.source, processed, (cast(ALuint[])sound.buffers).ptr);
+                    alSourceUnqueueBuffers(cast(ALuint) source.source, processed, (cast(ALuint[])sound.buffers).ptr); // Unqueue buffers that have been played.
 
-                    alDeleteBuffers(processed, (cast(ALuint[])sound.buffers).ptr);
-                    for(size_t i = 0; i < processed; i++) {
+                    alDeleteBuffers(processed, (cast(ALuint[])sound.buffers).ptr); // Delete the played buffers
+                    for(size_t i = 0; i < processed; i++) { // Go through each buffer that was played.
                         try {
-                            ALuint buffer = (cast(ALStreamedSound) sound).queueBuffer();
-                            sound.buffers[i] = buffer;
-                            /*debug {
-                                import std.stdio;
-                                writeln("refill ", i, " ", processed);
-                            }*/
-                        } catch(Exception e) {
-                            throw new Exception("CAUGHT EOF!");
+                            ALuint buffer = (cast(ALStreamedSound) sound).queueBuffer(); // load a new buffer
+                            sound.buffers[i] = buffer; // Add it to the array
+                        } catch(EOFException e) { // Check if we have finished reading the sound file
+                            if(loop) { // Check if we are looping the sound.
+                                (cast(ALStreamedSound) sound).reset(); // Reset the sound to the beginning (seek to zero frames)
+                                debug(blocksound_verbose) {
+                                    import std.stdio;
+                                    writeln("[BlockSound]: Dedicated streaming thread reset.");
+                                }
+                                continue;
+                            } else { // We are done here, time to close up shop.
+                                hasFinished = true;
+                                source.finishedPlaying = true; // Notify main thread that we are done.
+                                debug(blocksound_verbose) {
+                                    import std.stdio;
+                                    writeln("[BlockSound]: Dedicated streaming thread finished.");
+                                }
+                                break; // Break out of the loop, and exit the thread.
+                            }
                         }
                     }
 
-                    alSourceQueueBuffers(cast(ALuint) source.source, processed, (cast(ALuint[])sound.buffers).ptr);
+                    alSourceQueueBuffers(cast(ALuint) source.source, processed, (cast(ALuint[])sound.buffers).ptr); // Queue the new buffers to OpenAL.
                 }
+                
                 if(state != AL_PLAYING) {
                     alSourcePlay(source.source);
                 }
+                
 
-                Thread.sleep(dur!("msecs")(25));
+                Thread.sleep(dur!("msecs")(5)); // Sleep 5 msecs as to prevent high CPU usage.
             }
 
             if(hasFinished) {
+                source.finishedPlaying = true; // Notify main thread that we are done.
                 break;
             }
+        }
+
+        debug(blocksound_verbose) {
+            import std.stdio;
+            writeln("[BlockSound]: Exiting dedicated streaming thread.");
         }
     }
 
@@ -261,13 +306,15 @@ version(blocksound_ALBackend) {
 
     /// OpenAL Sound backend (for streaming)
     class ALStreamedSound : StreamedSound {
+        private string filename;
         private SF_INFO soundInfo;
         private SNDFILE* file;
 
         package ALuint numBuffers;
         package ALuint[] buffers;
 
-        private this(SF_INFO soundInfo, SNDFILE* file, ALuint numBuffers) @safe {
+        private this(in string filename, SF_INFO soundInfo, SNDFILE* file, ALuint numBuffers) @safe {
+            this.filename = filename;
             this.soundInfo = soundInfo;
             this.file = file;
             this.numBuffers = numBuffers;
@@ -290,13 +337,29 @@ version(blocksound_ALBackend) {
             // Fix for OGG pops and crackles.
             sf_command(file, SFC_SET_SCALE_FLOAT_INT_READ, cast(void*) 1, cast(int) byte.sizeof);
 
-            ALStreamedSound sound =  new ALStreamedSound(info, file, bufferNumber);
+            ALStreamedSound sound =  new ALStreamedSound(filename, info, file, bufferNumber);
             for(size_t i = 0; i < bufferNumber; i++) {
                 ALuint buffer = sound.queueBuffer();
                 sound.buffers[i] = buffer;
             }
 
             return sound;
+        }
+
+        /// Reset the file to the beginning.
+        package void reset() @system {
+            /* After a few times of repeating, pops and crackles start showing up.
+            import core.stdc.stdio : SEEK_SET;
+            sf_seek(file, 0, SEEK_SET);
+            sf_command(file, SFC_SET_SCALE_FLOAT_INT_READ, cast(void*) 1, cast(int) byte.sizeof);
+            */
+
+            sf_close(file);
+
+            file = sf_open(toCString(filename), SFM_READ, &soundInfo);
+
+            // Fix for OGG pops and crackles.
+            sf_command(file, SFC_SET_SCALE_FLOAT_INT_READ, cast(void*) 1, cast(int) byte.sizeof);
         }
 
         private ALuint queueBuffer() @system {
@@ -316,13 +379,16 @@ version(blocksound_ALBackend) {
         }
     }
 
+    /++
+        Read an amount of shorts from a sound file using libsndfile.
+    +/
     AudioBuffer sndfile_readShorts(SNDFILE* file, SF_INFO info, size_t frames) @system {
         AudioBuffer ab;
 
         ab.data = new short[frames * info.channels];
 
-        if((ab.remaining = sf_read_short(file, ab.data.ptr, ab.data.length)) == 0) {
-            throw new Exception("EOF!");
+        if((ab.remaining = sf_read_short(file, ab.data.ptr, ab.data.length)) <= 0) {
+            throw new EOFException("EOF!");
         } 
 
         return ab;

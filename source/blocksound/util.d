@@ -31,6 +31,14 @@ struct Vec3 {
     float z;
 }
 
+/// Represents an exception when an End-Of-File is reached.
+class EOFException : Exception {
+    /// Default constructor
+    this(in string msg) {
+        super(msg);
+    }
+}
+
 /++
     Helper class which emulates an ArrayList due to
     dynamic arrays not having a remove function for
