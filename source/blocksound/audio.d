@@ -38,7 +38,7 @@ version(blocksound_ALBackend) {
 
     Returns: A Sound instance loaded from the specified file.
 +/
-Sound loadSoundFile(in string file) @system {
+Sound loadSoundFile(in string file) @trusted {
     version(blocksound_ALBackend) {
         import blocksound.backend.openal : ALSound;
 
@@ -56,7 +56,7 @@ Sound loadSoundFile(in string file) @system {
 
     Returns: A StreamedSound instance loaded from the specified file.
 +/
-StreamedSound loadStreamingSoundFile(in string file, in size_t numBuffers = 4) @system {
+StreamedSound loadStreamingSoundFile(in string file, in size_t numBuffers = 4) @trusted {
     version(blocksound_ALBackend) {
         import blocksound.backend.openal : ALStreamedSound;
         import derelict.openal.al : ALuint;

@@ -93,7 +93,7 @@ abstract class Source {
         Returns: A new Source instance.
     +/
     deprecated("Use AudioManager.createSource()") 
-    static Source newSource(Vec3 location) {
+    static Source newSource(Vec3 location) @system {
         version(blocksound_ALBackend) {
             import blocksound.backend.openal : ALSource;
 

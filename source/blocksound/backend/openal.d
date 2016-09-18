@@ -31,6 +31,8 @@ version(blocksound_ALBackend) {
     import derelict.openal.al;
     import derelict.sndfile.sndfile;
 
+    import std.concurrency;
+
     /// Class to manage the OpenAL Audio backend.
     class ALAudioBackend : AudioBackend {
         protected ALCdevice* device;
@@ -74,7 +76,7 @@ version(blocksound_ALBackend) {
     class ALSource : Source {
         private ALuint source;
 
-        package this() {
+        package this() @trusted {
             alGenSources(1, &source);
         }
 
@@ -117,7 +119,6 @@ version(blocksound_ALBackend) {
 
     /// OpenAL Source backend (for streaming.)
     class ALStreamingSource : StreamingSource {
-        import std.concurrency;
 
         static immutable size_t
             STREAM_CMD_PLAY = 0,
@@ -136,7 +137,7 @@ version(blocksound_ALBackend) {
 
         package shared finishedPlaying = false;
 
-        package this() {
+        package this() @trusted {
             alGenSources(1, &source);
         }
 
@@ -190,9 +191,8 @@ version(blocksound_ALBackend) {
 
     /// The dedicated sound streaming thread. This is used to refill buffers while streaming sound.
     package void streamSoundThread(shared ALStreamingSource source, shared ALStreamedSound sound) @system {
-        import std.concurrency;
-        import std.datetime;
-        import core.thread;
+        import std.datetime : dur;
+        import core.thread : Thread;
 
         bool hasFinished = false;
         bool isPlaying = false;
@@ -238,6 +238,7 @@ version(blocksound_ALBackend) {
                     alSourceUnqueueBuffers(cast(ALuint) source.source, processed, (cast(ALuint[])sound.buffers).ptr); // Unqueue buffers that have been played.
 
                     alDeleteBuffers(processed, (cast(ALuint[])sound.buffers).ptr); // Delete the played buffers
+
                     for(size_t i = 0; i < processed; i++) { // Go through each buffer that was played.
                         try {
                             ALuint buffer = (cast(ALStreamedSound) sound).queueBuffer(); // load a new buffer
@@ -245,6 +246,7 @@ version(blocksound_ALBackend) {
                         } catch(EOFException e) { // Check if we have finished reading the sound file
                             if(loop) { // Check if we are looping the sound.
                                 (cast(ALStreamedSound) sound).reset(); // Reset the sound to the beginning (seek to zero frames)
+
                                 debug(blocksound_verbose) {
                                     import std.stdio;
                                     writeln("[BlockSound]: Dedicated streaming thread reset.");
@@ -253,6 +255,7 @@ version(blocksound_ALBackend) {
                             } else { // We are done here, time to close up shop.
                                 hasFinished = true;
                                 source.finishedPlaying = true; // Notify main thread that we are done.
+
                                 debug(blocksound_verbose) {
                                     import std.stdio;
                                     writeln("[BlockSound]: Dedicated streaming thread finished.");
