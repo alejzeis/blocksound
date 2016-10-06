@@ -27,7 +27,7 @@ import derelict.sndfile.sndfile;
 public import blocksound.util;
 
 /// Library Version
-immutable string VERSION = "v1.0-rc2";
+immutable string VERSION = "v1.1.1-alpha1";
 
 package shared bool INIT = false;
 
@@ -35,7 +35,7 @@ package shared bool INIT = false;
     Init the library. This must be called before any other library
     features are used.
 +/
-void init() @trusted {
+void blocksound_Init() @trusted {
     debug(blocksound_verbose) {
         import std.stdio : writeln;
         import blocksound.backend.types : BACKEND;

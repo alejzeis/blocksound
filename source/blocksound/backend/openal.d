@@ -74,7 +74,7 @@ version(blocksound_ALBackend) {
 
     /// OpenAL Source backend
     class ALSource : Source {
-        private ALuint source;
+        package ALuint source;
 
         package this() @trusted {
             alGenSources(1, &source);
@@ -247,6 +247,7 @@ version(blocksound_ALBackend) {
                             if(loop) { // Check if we are looping the sound.
                                 (cast(ALStreamedSound) sound).reset(); // Reset the sound to the beginning (seek to zero frames)
 
+                                alSourceStop((cast(ALStreamingSource) source).source);
                                 debug(blocksound_verbose) {
                                     import std.stdio;
                                     writeln("[BlockSound]: Dedicated streaming thread reset.");
@@ -273,7 +274,7 @@ version(blocksound_ALBackend) {
                 }
                 
 
-                Thread.sleep(dur!("msecs")(5)); // Sleep 5 msecs as to prevent high CPU usage.
+                Thread.sleep(dur!("msecs")(50)); // Sleep 50 msecs as to prevent high CPU usage.
             }
 
             if(hasFinished) {
@@ -337,9 +338,6 @@ version(blocksound_ALBackend) {
 
             file = sf_open(toCString(filename), SFM_READ, &info);
 
-            // Fix for OGG pops and crackles.
-            sf_command(file, SFC_SET_SCALE_FLOAT_INT_READ, cast(void*) 1, cast(int) byte.sizeof);
-
             ALStreamedSound sound =  new ALStreamedSound(filename, info, file, bufferNumber);
             for(size_t i = 0; i < bufferNumber; i++) {
                 ALuint buffer = sound.queueBuffer();
@@ -351,26 +349,16 @@ version(blocksound_ALBackend) {
 
         /// Reset the file to the beginning.
         package void reset() @system {
-            /* After a few times of repeating, pops and crackles start showing up.
             import core.stdc.stdio : SEEK_SET;
             sf_seek(file, 0, SEEK_SET);
-            sf_command(file, SFC_SET_SCALE_FLOAT_INT_READ, cast(void*) 1, cast(int) byte.sizeof);
-            */
-
-            sf_close(file);
-
-            file = sf_open(toCString(filename), SFM_READ, &soundInfo);
-
-            // Fix for OGG pops and crackles.
-            sf_command(file, SFC_SET_SCALE_FLOAT_INT_READ, cast(void*) 1, cast(int) byte.sizeof);
         }
 
         private ALuint queueBuffer() @system {
             ALuint buffer;
             alGenBuffers(1, &buffer);
 
-            AudioBuffer ab = sndfile_readShorts(file, soundInfo, 4800);
-            alBufferData(buffer, soundInfo.channels == 1 ? AL_FORMAT_MONO16 : AL_FORMAT_STEREO16, ab.data.ptr, cast(int) (ab.data.length * short.sizeof), soundInfo.samplerate);
+            AudioBufferFloat ab = sndfile_readFloats(file, soundInfo, 2400);
+            alBufferData(buffer, soundInfo.channels == 1 ? AL_FORMAT_MONO_FLOAT32 : AL_FORMAT_STEREO_FLOAT32, ab.data.ptr, cast(int) (ab.data.length * float.sizeof), soundInfo.samplerate);
             return buffer;
         }
 
@@ -385,6 +373,7 @@ version(blocksound_ALBackend) {
     /++
         Read an amount of shorts from a sound file using libsndfile.
     +/
+    deprecated("Reading as shorts can cause cracks in audio") 
     AudioBuffer sndfile_readShorts(SNDFILE* file, SF_INFO info, size_t frames) @system {
         AudioBuffer ab;
 
@@ -397,9 +386,30 @@ version(blocksound_ALBackend) {
         return ab;
     }
 
+    /++
+        Read an amount of shorts from a sound file using libsndfile.
+    +/
+    AudioBufferFloat sndfile_readFloats(SNDFILE* file, SF_INFO info, size_t frames) @system {
+        AudioBufferFloat ab;
+
+        ab.data = new float[frames * info.channels];
+
+        if((ab.remaining = sf_read_float(file, ab.data.ptr, ab.data.length)) <= 0) {
+            throw new EOFException("EOF!");
+        } 
+
+        return ab;
+    }
+
     
+    deprecated("Reading as shorts can cause cracks in audio") 
     package struct AudioBuffer {
         short[] data;
+        sf_count_t remaining;
+    }
+
+    package struct AudioBufferFloat {
+        float[] data;
         sf_count_t remaining;
     }
 
@@ -423,20 +433,21 @@ version(blocksound_ALBackend) {
         SF_INFO info;
         SNDFILE* file = sf_open(toCString(filename), SFM_READ, &info);
 
-        // Fix for OGG pops and crackles.
-        sf_command(file, SFC_SET_SCALE_FLOAT_INT_READ, cast(void*) 1, cast(int) byte.sizeof);
-
-        short[] data;
-        short[] readBuf = new short[4096];
+        float[] data;
+        float[] readBuf = new float[2048];
 
         long readSize = 0;
-        while((readSize = sf_read_short(file, readBuf.ptr, readBuf.length)) != 0) {
+        while((readSize = sf_read_float(file, readBuf.ptr, readBuf.length)) != 0) {
             data ~= readBuf[0..(cast(size_t) readSize)];
         }
 
         ALuint buffer;
         alGenBuffers(1, &buffer);
-        alBufferData(buffer, info.channels == 1 ? AL_FORMAT_MONO16 : AL_FORMAT_STEREO16, data.ptr, cast(int) (data.length * short.sizeof), info.samplerate);
+        debug(blocksound_soundInfo) {
+            import std.stdio : writeln;
+            writeln("Loading sound ", filename, ": has ", info.channels, " channels.");
+        }
+        alBufferData(buffer, info.channels == 1 ? AL_FORMAT_MONO_FLOAT32 : AL_FORMAT_STEREO_FLOAT32, data.ptr, cast(int) (data.length * float.sizeof), info.samplerate);
 
         sf_close(file);
 
