@@ -27,7 +27,7 @@ import derelict.sndfile.sndfile;
 public import blocksound.util;
 
 /// Library Version
-immutable string VERSION = "v1.1.1-alpha1";
+immutable string VERSION = "v1.1.1-alpha2";
 
 package shared bool INIT = false;
 
