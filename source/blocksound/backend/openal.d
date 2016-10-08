@@ -191,12 +191,14 @@ version(blocksound_ALBackend) {
 
     /// The dedicated sound streaming thread. This is used to refill buffers while streaming sound.
     package void streamSoundThread(shared ALStreamingSource source, shared ALStreamedSound sound) @system {
-        import std.datetime : dur;
+        import std.datetime;
         import core.thread : Thread;
 
         bool hasFinished = false;
         bool isPlaying = false;
         bool loop = false;
+
+        //bool waitForLoop = false; // Wait for AL to go through all the buffers.
 
         debug(blocksound_verbose) {
             import std.stdio;
@@ -229,13 +231,19 @@ version(blocksound_ALBackend) {
                     }
             });
 
+isPlayingLabel:
             if(isPlaying) { // Check if we are supposed to be playing (refilling buffers)
                 ALint state, processed;
 
                 alGetSourcei(source.source, AL_SOURCE_STATE, &state); // Get the state of the audio.
                 alGetSourcei(source.source, AL_BUFFERS_PROCESSED, &processed); // Get the amount of buffers that OpenAL has played.
+
                 if(processed > 0) {
                     alSourceUnqueueBuffers(cast(ALuint) source.source, processed, (cast(ALuint[])sound.buffers).ptr); // Unqueue buffers that have been played.
+                    debug(blocksound_verbose2) {
+                        import std.stdio;
+                        writeln("[BlockSound/DEBUG ", Clock.currTime().second, "]: STATE, ", state, " ", AL_PLAYING, " Unqueued ", processed, " buffers.");
+                    }
 
                     alDeleteBuffers(processed, (cast(ALuint[])sound.buffers).ptr); // Delete the played buffers
 
@@ -245,21 +253,28 @@ version(blocksound_ALBackend) {
                             sound.buffers[i] = buffer; // Add it to the array
                         } catch(EOFException e) { // Check if we have finished reading the sound file
                             if(loop) { // Check if we are looping the sound.
-                                (cast(ALStreamedSound) sound).reset(); // Reset the sound to the beginning (seek to zero frames)
+                                debug(blocksound_verbose2) {
+                                    import std.stdio;
+                                    writeln("[BlockSound/DEBUG", Clock.currTime().second, "]: Resetting...");
+                                }
+                                //alSourceStop((cast(ALStreamingSource) source).source);
+                                (cast(ALStreamedSound) sound).reset();
 
-                                alSourceStop((cast(ALStreamingSource) source).source);
+                                ALuint buffer = (cast(ALStreamedSound) sound).queueBuffer(); // load a new buffer
+                                sound.buffers[i] = buffer; // Add it to the array
+
                                 debug(blocksound_verbose) {
                                     import std.stdio;
-                                    writeln("[BlockSound]: Dedicated streaming thread reset.");
+                                    writeln("[BlockSound ", Clock.currTime().second, "]: Dedicated streaming thread reset.");
                                 }
-                                continue;
+                                break;
                             } else { // We are done here, time to close up shop.
                                 hasFinished = true;
                                 source.finishedPlaying = true; // Notify main thread that we are done.
 
                                 debug(blocksound_verbose) {
                                     import std.stdio;
-                                    writeln("[BlockSound]: Dedicated streaming thread finished.");
+                                    writeln("[BlockSound ", Clock.currTime().second, "]: Dedicated streaming thread finished.");
                                 }
                                 break; // Break out of the loop, and exit the thread.
                             }
@@ -267,14 +282,22 @@ version(blocksound_ALBackend) {
                     }
 
                     alSourceQueueBuffers(cast(ALuint) source.source, processed, (cast(ALuint[])sound.buffers).ptr); // Queue the new buffers to OpenAL.
+                    debug(blocksound_verbose2) {
+                        import std.stdio;
+                        writeln("[BlockSound/DEBUG ", Clock.currTime().second, "]: Queued ", processed, " buffers.");
+                    }
                 }
                 
-                if(state != AL_PLAYING) {
+                if(state != AL_PLAYING && !hasFinished) {
+                    debug(blocksound_verbose2) {
+                        import std.stdio;
+                        writeln("[BlockSound/DEBUG ", Clock.currTime().second, "]: Set to play.");
+                    }
                     alSourcePlay(source.source);
                 }
                 
 
-                Thread.sleep(dur!("msecs")(50)); // Sleep 50 msecs as to prevent high CPU usage.
+                Thread.sleep(dur!("msecs")(5)); // Sleep 5 msecs as to prevent high CPU usage.
             }
 
             if(hasFinished) {
@@ -357,7 +380,7 @@ version(blocksound_ALBackend) {
             ALuint buffer;
             alGenBuffers(1, &buffer);
 
-            AudioBufferFloat ab = sndfile_readFloats(file, soundInfo, 2400);
+            AudioBufferFloat ab = sndfile_readFloats(file, soundInfo, 48_000);
             alBufferData(buffer, soundInfo.channels == 1 ? AL_FORMAT_MONO_FLOAT32 : AL_FORMAT_STEREO_FLOAT32, ab.data.ptr, cast(int) (ab.data.length * float.sizeof), soundInfo.samplerate);
             return buffer;
         }
