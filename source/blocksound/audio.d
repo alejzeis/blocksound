@@ -69,25 +69,25 @@ StreamedSound loadStreamingSoundFile(in string file, in size_t numBuffers = 4) @
 
 /// Manages the Audio.
 class AudioManager {
-    private Vec3 _listenerLocation;
-    private float _gain;
+    private shared Vec3 _listenerLocation;
+    private shared float _gain;
 
     private AudioBackend backend;
     private shared ArrayList!Source sources;
 
     /// The location where the listener is.
-    @property Vec3 listenerLocation() @safe nothrow { return _listenerLocation; }
+    @property Vec3 listenerLocation() @trusted nothrow { return cast(Vec3) _listenerLocation; }
     /// The location where the listener is.
     @property void listenerLocation(Vec3 loc) @safe {
-        _listenerLocation = loc; 
+        _listenerLocation = cast(shared) loc; 
         backend.setListenerLocation(loc); 
     }
 
     /// The listener's gain or volume.
-    @property float gain() @safe nothrow { return _gain; }
+    @property float gain() @trusted nothrow { return cast(shared) _gain; }
     /// The listener's gain or volume.
     @property void gain(float gain) @safe {
-        _gain = gain;
+        _gain = cast(shared) gain;
         backend.setListenerGain(gain);
     }
 
