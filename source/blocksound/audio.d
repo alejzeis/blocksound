@@ -30,6 +30,10 @@ version(blocksound_ALBackend) {
     import blocksound.backend.openal;
 }
 
+class Lock {
+
+}
+
 /++
     Loads a Sound from a file.
 
@@ -69,6 +73,9 @@ StreamedSound loadStreamingSoundFile(in string file, in size_t numBuffers = 4) @
 
 /// Manages the Audio.
 class AudioManager {
+    private shared Lock listenerLock;
+    private shared Lock gainLock;
+
     private shared Vec3 _listenerLocation;
     private shared float _gain;
 
@@ -76,19 +83,31 @@ class AudioManager {
     private shared ArrayList!Source sources;
 
     /// The location where the listener is.
-    @property Vec3 listenerLocation() @trusted nothrow { return cast(Vec3) _listenerLocation; }
+    @property Vec3 listenerLocation() @trusted {
+        synchronized(listenerLock) { 
+            return cast(Vec3) _listenerLocation;
+        } 
+    }
     /// The location where the listener is.
     @property void listenerLocation(Vec3 loc) @safe {
-        _listenerLocation = cast(shared) loc; 
-        backend.setListenerLocation(loc); 
+        synchronized(listenerLock) {
+            _listenerLocation = cast(shared) loc; 
+            backend.setListenerLocation(loc);
+        } 
     }
 
     /// The listener's gain or volume.
-    @property float gain() @trusted nothrow { return cast(shared) _gain; }
+    @property float gain() @trusted {
+        synchronized(gainLock) { 
+            return cast(shared) _gain;
+        } 
+    }
     /// The listener's gain or volume.
     @property void gain(float gain) @safe {
-        _gain = cast(shared) gain;
-        backend.setListenerGain(gain);
+        synchronized(gainLock) {
+            _gain = cast(shared) gain;
+            backend.setListenerGain(gain);
+        }
     }
 
     /++
