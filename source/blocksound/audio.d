@@ -125,6 +125,9 @@ class AudioManager {
             throw new Exception("No backend avaliable! (Try compiling with version \"blocksound_ALBackend\" enabled)");
         }
 
+        listenerLock = new Lock();
+        gainLock = new Lock();
+
         sources = new ArrayList!Source();
     }
 
