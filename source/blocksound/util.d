@@ -23,12 +23,21 @@ module blocksound.util;
 
 /// Vector 3 struct with floats.
 struct Vec3 {
-    /// X coordinate
-    float x;
-    /// Y coordinate
-    float y;
-    /// Z coordinate
-    float z;
+    private shared float _x;
+    private shared float _y;
+    private shared float _z;
+
+    @property float x() @safe nothrow { return _x; }
+
+    @property float y() @safe nothrow { return _y; }
+
+    @property float z() @safe nothrow { return _z; }
+
+    this(float x, float y, float z) @safe nothrow {
+        this._x = x;
+        this._y = y;
+        this._z = z;
+    }
 }
 
 /// Represents an exception when an End-Of-File is reached.
