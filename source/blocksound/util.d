@@ -27,11 +27,11 @@ struct Vec3 {
     private shared float _y;
     private shared float _z;
 
-    @property float x() @safe nothrow { return _x; }
+    @property float x() @safe nothrow const { return _x; }
 
-    @property float y() @safe nothrow { return _y; }
+    @property float y() @safe nothrow const { return _y; }
 
-    @property float z() @safe nothrow { return _z; }
+    @property float z() @safe nothrow const { return _z; }
 
     this(float x, float y, float z) @safe nothrow {
         this._x = x;
