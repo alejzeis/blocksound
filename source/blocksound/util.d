@@ -40,6 +40,11 @@ struct Vec3 {
     }
 }
 
+/// Dummy class for locks
+class Lock {
+
+}
+
 /// Represents an exception when an End-Of-File is reached.
 class EOFException : Exception {
     /// Default constructor

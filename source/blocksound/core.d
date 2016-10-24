@@ -50,8 +50,12 @@ void blocksound_Init() @trusted {
     }
 
     version(blocksound_ALBackend) {
-        import blocksound.backend.openal;
+        import blocksound.backend.openal : ALBackend;
         
+        ALBackend bk = new ALBackend();
+        bk.doInit();
+
+        backend = cast(shared) bk;
     } else {
         writeln("[BlockSound]: WARNING: No backend has been compiled! Try compiling blocksound with the \"openal-backend\" configuration!");
     }
