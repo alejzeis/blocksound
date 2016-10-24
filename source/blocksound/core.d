@@ -24,36 +24,41 @@ module blocksound.core;
 import derelict.openal.al;
 import derelict.sndfile.sndfile;
 
-public import blocksound.util;
+import blocksound.backend.core;
 
 /// Library Version
 immutable string VERSION = "v2.0.0-alpha1";
 
-package shared bool INIT = false;
+private shared bool INIT = false;
+private shared Backend backend;
+
+/// Returns true if the library has initialized.
+bool hasInitialized() @safe nothrow {
+    return INIT;
+} 
 
 /++
     Init the library. This must be called before any other library
     features are used.
 +/
 void blocksound_Init() @trusted {
-    debug(blocksound_verbose) {
+    debug(blocksound_debug) {
         import std.stdio : writeln;
-        import blocksound.backend.types : BACKEND;
 
-        writeln("\n[BlockSound]: BlockSound ", VERSION, " compiled with ", BACKEND, " backend.");
+        writeln("\n[BlockSound]: BlockSound ", VERSION, " compiled with ", __VENDOR__, " on ", __TIMESTAMP__);
         writeln("[BlockSound]: Loading libraries...");
     }
 
     version(blocksound_ALBackend) {
-        import blocksound.backend.openal : loadLibraries;
-        loadLibraries(); //TODO: skipALload, skipSFload
+        import blocksound.backend.openal;
+        
     } else {
-        writeln("[BlockSound]: WARNING: No backend detected! Try compiling blocksound with the \"openal-backend\" configuration!");
+        writeln("[BlockSound]: WARNING: No backend has been compiled! Try compiling blocksound with the \"openal-backend\" configuration!");
     }
 
     INIT = true;
 
-    debug(blocksound_verbose) {
+    debug(blocksound_debug) {
         import std.stdio : writeln;
         writeln("[BlockSound]: Libraries loaded.\n");
     }
