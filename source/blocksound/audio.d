@@ -38,7 +38,7 @@ private struct SetGainMessage {
     shared float gain;
 }
 
-class AudioManager {
+abstract class AudioManager {
     private shared Lock listenerLock;
     private shared Lock gainLock;
 
@@ -50,11 +50,7 @@ class AudioManager {
     private shared bool running;
 
     /// Get the location of the listener
-    @property Vec3 listenerLocation() @trusted {
-        synchronized(listenerLock) { 
-            return _listenerLocation; 
-        }
-    }
+    @property Vec3 listenerLocation() @trusted { synchronized(listenerLock) { return _listenerLocation; } }
     /// Set the location of the listener
     @property void listenerLocation(Vec3 listenerLocation) @trusted {
         synchronized(listenerLock) {
@@ -63,11 +59,7 @@ class AudioManager {
         send(cast(Tid) threadTid, SetListenerLocationMessage(cast(shared) listenerLocation));
     }
 
-    @property float gain() @trusted {
-        synchronized(gainLock) { 
-            return _gain; 
-        }
-    }
+    @property float gain() @trusted { synchronized(gainLock) { return _gain; } }
 
     @property void gain(float gain) @trusted {
         synchronized(gainLock) {
@@ -110,6 +102,8 @@ class AudioManager {
             );
         }
 
+        doCleanup();
+
         debug(blocksound_debug) {
             import std.stdio : writeln;
             writeln("[BlockSound]: Exiting AudioManager thread.");
@@ -118,4 +112,27 @@ class AudioManager {
 
     abstract protected void setListenerLocation(Vec3 listenerLocation) @system;
     abstract protected void setGain(float gain) @system;
+    abstract protected void doCleanup() @system;
+}
+
+abstract class Source {
+    private shared Lock locationLock;
+    private shared Lock soundLock;
+
+    private shared Vec3 _location;
+    private shared Sound _sound;
+
+    @property Vec3 location() @trusted { synchronized(locationLock) { return cast(Vec3) _location; } }
+    @property void location(Vec3 location) @trusted { 
+        synchronized(locationLock) {
+            this._location = cast(shared) location;
+        }
+    }
+
+    abstract protected void setLocation(Vec3 location) @system;
+    abstract protected void setSound(Sound sound) @system;
+}
+
+class Sound {
+
 }

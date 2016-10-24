@@ -32,16 +32,20 @@ class ALAudioManager : AudioManager {
         device = alcOpenDevice(null);
         context = alcCreateContext(device, null);
 
-        alcMakeContextCurrent(context);        
+        alcMakeContextCurrent(context);
     }
 
     override {
         protected void setListenerLocation(Vec3 listenerLocation) @system {
-
+            alListener3f(AL_POSITION, listenerLocation.x, listenerLocation.y, listenerLocation.z);
         }
 
         protected void setGain(float gain) @system {
+            alListenerf(AL_GAIN, gain);
+        }
 
+        protected void doCleanup() @system {
+            alcCloseDevice(device);
         }
     }
 }
