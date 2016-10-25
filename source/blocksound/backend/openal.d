@@ -49,3 +49,27 @@ class ALAudioManager : AudioManager {
         }
     }
 }
+
+class ALSource : Source {
+    private ALuint source;
+
+    this(AudioManager manager, Vec3 location) @safe {
+        super(manager, location);
+
+        setupSource();
+    }
+
+    private void setupSource() @trusted nothrow {
+        alGenSources(1, &source);
+    }
+
+    override {
+        protected void setLocation(Vec3 location) @system {
+            alSource3f(source, AL_POSITION, location.x, location.y, location.z);
+        }
+
+        protected void setSound(Sound sound) @system {
+            // TODO:
+        }
+    }
+}

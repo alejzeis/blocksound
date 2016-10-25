@@ -21,6 +21,7 @@
 */
 module blocksound.audio;
 
+import blocksound.backend.core;
 import blocksound.core;
 import blocksound.util;
 
@@ -38,6 +39,16 @@ private struct SetGainMessage {
     shared float gain;
 }
 
+private struct SourceSetLocationMessage {
+    shared Source source;
+    shared Vec3 location;
+}
+
+private struct SourceSetSoundMessage {
+    shared Source source;
+    shared Sound sound;
+}
+
 abstract class AudioManager {
     private shared Lock listenerLock;
     private shared Lock gainLock;
@@ -45,7 +56,7 @@ abstract class AudioManager {
     private shared Vec3 _listenerLocation;
     private shared float _gain;
 
-    private shared Tid threadTid;
+    package shared Tid threadTid;
 
     private shared bool running;
 
@@ -80,8 +91,6 @@ abstract class AudioManager {
     }
 
     static AudioManager audioManagerFactory(Vec3 listenerLocation, float gain) @safe {
-        import blocksound.backend.core : FactoryTemplate;
-
         mixin(FactoryTemplate!("AudioManager", "listenerLocation, gain"));
     }
 
@@ -98,6 +107,12 @@ abstract class AudioManager {
                 },
                 (SetGainMessage m) {
                     setGain(m.gain);
+                },
+                (SourceSetLocationMessage m) {
+                    (cast(Source) m.source).setLocation(cast(Vec3) m.location);
+                },
+                (SourceSetSoundMessage m) {
+                    (cast(Source) m.source).setSound(cast(Sound) m.sound);
                 }
             );
         }
@@ -119,14 +134,36 @@ abstract class Source {
     private shared Lock locationLock;
     private shared Lock soundLock;
 
+    private shared AudioManager _manager;
+
     private shared Vec3 _location;
     private shared Sound _sound;
+
+    @property AudioManager manager() @trusted nothrow { return cast(AudioManager) _manager; }
 
     @property Vec3 location() @trusted { synchronized(locationLock) { return cast(Vec3) _location; } }
     @property void location(Vec3 location) @trusted { 
         synchronized(locationLock) {
             this._location = cast(shared) location;
         }
+        send(cast(Tid) manager.threadTid, SourceSetLocationMessage(cast(shared) this, this._location));
+    }
+
+    @property Sound sound() @trusted { synchronized(soundLock) { return cast(Sound) _sound; } }
+    @property void sound(Sound sound) @trusted {
+        synchronized(soundLock) {
+            this._sound = cast(shared) sound;
+        }
+        send(cast(Tid) manager.threadTid, SourceSetSoundMessage(cast(shared) this, this._sound));
+    }
+
+    this(AudioManager manager, Vec3 location) @trusted {
+        this._manager = cast(shared) manager;
+        this.location = location;
+    }
+
+    static Source sourceFactory(AudioManager manager, Vec3 location) @safe {
+        mixin(FactoryTemplate!("Source", "manager, location"));
     }
 
     abstract protected void setLocation(Vec3 location) @system;
