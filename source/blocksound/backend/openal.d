@@ -69,7 +69,26 @@ class ALSource : Source {
         }
 
         protected void setSound(Sound sound) @system {
-            // TODO:
+            ALSound sound_ = cast(ALSound) sound;
+            if(sound_ !is null) {
+                alSourcei(source, AL_BUFFER, sound_.buffer);
+            }
+        }
+
+        protected void play_() @system {
+            alSourcePlay(source);
+        }
+
+        protected void pause_() @system {
+            alSourcePause(source);
+        }
+
+        protected void stop_() @system {
+            alSourceStop(source);
         }
     }
+}
+
+class ALSound : Sound {
+    package ALuint buffer;
 }

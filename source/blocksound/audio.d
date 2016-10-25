@@ -49,6 +49,19 @@ private struct SourceSetSoundMessage {
     shared Sound sound;
 }
 
+private enum SourceAction {
+    SOURCE_PLAY,
+    SOURCE_PAUSE,
+    SOURCE_STOP,
+    SOURCE_LOOP_TRUE,
+    SOURCE_LOOP_FALSE
+}
+
+private struct SourceActionMessage {
+    shared Source source;
+    shared SourceAction action;
+}
+
 abstract class AudioManager {
     private shared Lock listenerLock;
     private shared Lock gainLock;
@@ -113,6 +126,24 @@ abstract class AudioManager {
                 },
                 (SourceSetSoundMessage m) {
                     (cast(Source) m.source).setSound(cast(Sound) m.sound);
+                },
+                (SourceActionMessage m) {
+                    Source source = cast(Source) m.source;
+                    final switch(m.action) {
+                        case SourceAction.SOURCE_PLAY:
+                            source.play_();
+                            break;
+                        case SourceAction.SOURCE_PAUSE:
+                            source.pause_();
+                            break;
+                        case SourceAction.SOURCE_STOP:
+                            source.stop_();
+                            break;
+                        case SourceAction.SOURCE_LOOP_TRUE:
+                        case SourceAction.SOURCE_LOOP_FALSE:
+                            // TODO!
+                            break;
+                    }
                 }
             );
         }
@@ -166,10 +197,25 @@ abstract class Source {
         mixin(FactoryTemplate!("Source", "manager, location"));
     }
 
+    void play() @trusted {
+        send(cast(Tid) manager.threadTid, SourceActionMessage(cast(shared) this, SourceAction.SOURCE_PLAY));
+    }
+
+    void pause() @trusted {
+        send(cast(Tid) manager.threadTid, SourceActionMessage(cast(shared) this, SourceAction.SOURCE_PAUSE));
+    }
+
+    void stop() @trusted {
+        send(cast(Tid) manager.threadTid, SourceActionMessage(cast(shared) this, SourceAction.SOURCE_STOP));
+    }
+
     abstract protected void setLocation(Vec3 location) @system;
     abstract protected void setSound(Sound sound) @system;
+    abstract protected void play_() @system;
+    abstract protected void pause_() @system;
+    abstract protected void stop_() @system;
 }
 
 class Sound {
-
+    
 }
