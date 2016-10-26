@@ -109,8 +109,7 @@ abstract class AudioManager {
 
     package void doRun() @system {
         debug(blocksound_debug) {
-            import std.stdio : writeln;
-            writeln("[BlockSound]: Starting AudioManager thread.");
+            blocksound_getBackend().logger.logDebug("Entering AudioManager thread.");
         }
 
         while(running) {
@@ -151,8 +150,7 @@ abstract class AudioManager {
         doCleanup();
 
         debug(blocksound_debug) {
-            import std.stdio : writeln;
-            writeln("[BlockSound]: Exiting AudioManager thread.");
+            blocksound_getBackend().logger.logDebug("Exiting AudioManager thread.");
         }
     }
 
@@ -216,6 +214,10 @@ abstract class Source {
     abstract protected void stop_() @system;
 }
 
-class Sound {
-    
+abstract class Sound {
+    immutable string filename;
+
+    protected this(in string filename) @safe nothrow {
+        this.filename = filename;
+    }
 }

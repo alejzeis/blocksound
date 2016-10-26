@@ -24,6 +24,7 @@ module blocksound.core;
 import derelict.openal.al;
 import derelict.sndfile.sndfile;
 
+import blocksound.util;
 import blocksound.backend.core;
 
 /// Library Version
@@ -33,37 +34,42 @@ private shared bool INIT = false;
 private shared Backend backend;
 
 /// Returns true if the library has initialized.
-bool hasInitialized() @safe nothrow {
+bool blocksound_hasInitialized() @safe nothrow {
     return INIT;
-} 
+}
+
+/// Returns the Backend that is being used by the library.
+Backend blocksound_getBackend() @trusted nothrow {
+    return cast(Backend) backend;
+}
 
 /++
     Init the library. This must be called before any other library
     features are used.
 +/
-void blocksound_Init() @trusted {
-    debug(blocksound_debug) {
-        import std.stdio : writeln;
+void blocksound_Init(BlockSoundLogger logger) @trusted {
+    if(INIT) return;
 
-        writeln("\n[BlockSound]: BlockSound ", VERSION, " compiled with ", __VENDOR__, " on ", __TIMESTAMP__);
-        writeln("[BlockSound]: Loading libraries...");
+    logger.logInfo("BlockSound " ~ VERSION ~" compiled with " ~ __VENDOR__ ~ " on " ~ __TIMESTAMP__);
+
+    debug(blocksound_debug) {
+        logger.logDebug("Loading libraries...");
     }
 
     version(blocksound_ALBackend) {
         import blocksound.backend.openal : ALBackend;
         
-        ALBackend bk = new ALBackend();
+        ALBackend bk = new ALBackend(logger);
         bk.doInit();
 
         backend = cast(shared) bk;
     } else {
-        writeln("[BlockSound]: WARNING: No backend has been compiled! Try compiling blocksound with the \"openal-backend\" configuration!");
+        logger.logWarn("No backend has been compiled! Try compiling blocksound with the \"openal-backend\" configuration!");
     }
 
     INIT = true;
 
     debug(blocksound_debug) {
-        import std.stdio : writeln;
-        writeln("[BlockSound]: Libraries loaded.\n");
+        logger.logDebug("Libraries loaded.\n");
     }
 }

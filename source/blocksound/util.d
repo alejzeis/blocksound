@@ -21,6 +21,13 @@
 */
 module blocksound.util;
 
+interface BlockSoundLogger {
+    void logDebug(in string message) @system;
+    void logInfo(in string message) @system;
+    void logWarn(in string message) @system;
+    void logError(in string message) @system;
+}
+
 /// Vector 3 struct with floats.
 struct Vec3 {
     private shared float _x;

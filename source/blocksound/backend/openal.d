@@ -2,14 +2,47 @@ module blocksound.backend.openal;
 
 import blocksound.audio;
 import blocksound.util;
+import blocksound.core;
 import blocksound.backend.core;
 
 import derelict.openal.al;
+import derelict.sndfile.sndfile;
+
+private template LoadLibrary(string libName, string suffix, string winName) {
+    const char[] LoadLibrary = "
+    version(Windows) {
+        try {
+            Derelict" ~ suffix ~ ".load();
+            blocksound_getBackend().logger.logDebug(\"Loaded " ~ libName ~ "\");
+        } catch(Exception e) {
+            blocksound_getBackend().logger.logDebug(\"Failed to load library \" ~ libName ~ \", searching in provided libs\");
+            try {
+                Derelict" ~ suffix ~ ".load(\"lib/" ~ winName ~ ".dll\");
+                blocksound_getBackend().logger.logDebug(\"Loaded " ~ libName ~ "\");
+            } catch(Exception e) {
+                throw new Exception(\"Failed to load library " ~ libName ~ ": e.toString()\");
+            }
+        }
+    } else {
+        try {
+            Derelict" ~ suffix ~ ".load();
+            blocksound_getBackend().logger.logDebug(\"Loaded " ~ libName ~ "\");
+        } catch(Exception e) {
+            throw new Exception(\"Failed to load library " ~ libName ~ ": e.toString()\");
+        }
+    }";
+}
 
 class ALBackend : Backend {
+
+    this(BlockSoundLogger logger) @safe nothrow {
+        super(logger);
+    }
+
     override {
         void doInit() @system {
-            
+            mixin(LoadLibrary!("OpenAL", "AL", "openal32"));
+            mixin(LoadLibrary!("libsndfile", "SndFile", "libsndfile-1"));
         }
         
         void doDestroy() @system {
@@ -91,4 +124,28 @@ class ALSource : Source {
 
 class ALSound : Sound {
     package ALuint buffer;
+
+    this(in string filename) @safe {
+        super(filename);
+
+        loadSound(filename);
+    }
+
+    private void loadSound(in string filename) @trusted {
+        import std.exception : enforce;
+        import std.file : exists;
+
+        enforce(exists(filename), new Exception("File \"" ~ filename ~ "\" does not exist!"));
+
+        SF_INFO info;
+        SNDFILE* file = sf_open(toCString(filename), SFM_READ, &info);
+
+        float[] data;
+        float[] readBuf = new float[2048];
+        
+        long readSize = 0;
+        while((readSize = sf_read_float(file, readBuf.ptr, readBuf.length)) != 0) {
+            //blocksound_getBackend().logger.logDebug("Loading sound " ~ filename ~ ": has ")
+        }
+    }
 }
