@@ -81,6 +81,7 @@ class ALAudioManager : AudioManager {
 
         protected void doCleanup() @system {
             alcCloseDevice(device);
+            alcDestroyContext(context);
         }
     }
 }

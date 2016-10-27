@@ -31,6 +31,10 @@ private void spawnAudioThread(shared AudioManager manager) @system {
     (cast(AudioManager) manager).doRun();
 }
 
+private struct StopThreadMessage {
+
+}
+
 private struct SetListenerLocationMessage {
     shared Vec3 listenerLocation;
 }
@@ -114,6 +118,10 @@ abstract class AudioManager {
 
         while(running) {
             receive(
+                (StopThreadMessage m) {
+                    // TODO: Clean sources and sounds up!
+                    running = false;
+                },
                 (SetListenerLocationMessage m) {
                     setListenerLocation(m.listenerLocation);
                 },
@@ -154,6 +162,10 @@ abstract class AudioManager {
         }
     }
 
+    void stopThread() @trusted {
+        send(cast(Tid) threadTid, StopThreadMessage());
+    }
+
     abstract protected void setListenerLocation(Vec3 listenerLocation) @system;
     abstract protected void setGain(float gain) @system;
     abstract protected void doCleanup() @system;
@@ -186,7 +198,7 @@ abstract class Source {
         send(cast(Tid) manager.threadTid, SourceSetSoundMessage(cast(shared) this, this._sound));
     }
 
-    this(AudioManager manager, Vec3 location) @trusted {
+    protected this(AudioManager manager, Vec3 location) @trusted {
         this._manager = cast(shared) manager;
         this.location = location;
     }
@@ -215,10 +227,15 @@ abstract class Source {
 }
 
 abstract class Sound {
+    /// The filename from which the sound was loaded.
     immutable string filename;
 
     protected this(in string filename) @safe nothrow {
         this.filename = filename;
+    }
+
+    static Sound soundFactory(in string filename) @safe {
+        mixin(FactoryTemplate!("Sound", "filename"));
     }
 
     abstract void cleanup() @system;
