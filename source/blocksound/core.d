@@ -60,9 +60,9 @@ void blocksound_Init(BlockSoundLogger logger) @trusted {
         import blocksound.backend.openal : ALBackend;
         
         ALBackend bk = new ALBackend(logger);
-        bk.doInit();
-
         backend = cast(shared) bk;
+        
+        bk.doInit();
     } else {
         logger.logWarn("No backend has been compiled! Try compiling blocksound with the \"openal-backend\" configuration!");
     }

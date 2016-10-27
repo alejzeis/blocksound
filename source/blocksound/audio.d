@@ -220,4 +220,6 @@ abstract class Sound {
     protected this(in string filename) @safe nothrow {
         this.filename = filename;
     }
+
+    abstract void cleanup() @system;
 }

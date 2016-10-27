@@ -8,6 +8,8 @@ import blocksound.backend.core;
 import derelict.openal.al;
 import derelict.sndfile.sndfile;
 
+import std.conv;
+
 private template LoadLibrary(string libName, string suffix, string winName) {
     const char[] LoadLibrary = "
     version(Windows) {
@@ -140,12 +142,23 @@ class ALSound : Sound {
         SF_INFO info;
         SNDFILE* file = sf_open(toCString(filename), SFM_READ, &info);
 
+        blocksound_getBackend().logger.logDebug("Loading sound " ~ filename ~ ": has " ~ to!string(info.channels) ~ " channels.");
+
         float[] data;
         float[] readBuf = new float[2048];
         
         long readSize = 0;
         while((readSize = sf_read_float(file, readBuf.ptr, readBuf.length)) != 0) {
-            //blocksound_getBackend().logger.logDebug("Loading sound " ~ filename ~ ": has ")
+            data ~= readBuf[0..(cast(size_t) readSize)];
         }
+
+        alGenBuffers(1, &buffer);
+        alBufferData(buffer, info.channels == 1 ? AL_FORMAT_MONO_FLOAT32 : AL_FORMAT_STEREO_FLOAT32, data.ptr, cast(int) (data.length * float.sizeof), info.samplerate);
+
+        sf_close(file);
+    }
+
+    override void cleanup() @system {
+        alDeleteBuffers(1, &buffer);
     }
 }
